@@ -5,7 +5,7 @@ defmodule Ip2regionXdb.MixProject do
     [
       app: :ip2region_xdb,
       version: "0.1.0",
-      elixir: "~> 1.18",
+      elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
