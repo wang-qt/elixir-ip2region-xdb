@@ -1,7 +1,8 @@
 defmodule Ip2regionXdb.Database  do
   @moduledoc """
   IP2Region XDB 数据库查询模块, 负责查询 IP 对应的地域信息.
-  https://ip2region.net/doc/xdb/structure
+  xdb文件格式描述: https://ip2region.net/doc/xdb/structure
+  Database 模块负责查询，xdb数据在启动后，已经加载到 ets 和 agent 中.
   """
 
   alias Ip2regionXdb.Database.Storage
@@ -15,7 +16,28 @@ defmodule Ip2regionXdb.Database  do
   # 所以整个vector索引段占据的空间为：256 × 256 × 8 = 524288 Bytes = 512 KiB
   @bytes_512k  524288
 
-  # ip: {a,b,c,d}
+  @doc """
+  查询 IP 对应的地域信息.
+  ip: {a,b,c,d} 格式的 IP 地址元组
+  返回 {:ok, "中国|陕西省|西安市|电信|CN"} 格式的地域信息字符串
+
+  前提: 在ip2region_xdb app初始化时, 读取并解析 xdb 文件
+  1. 把 VECTOR_INDEX 向量索引段，加载到ets中。
+  2. 地域信息段，加载到 agent中
+  3. SEGMENT_INDEX 二分索引段数据加载到 agent中
+
+  查询流程:
+  1. 根据 IP 地址的前 2 个字节，在向量索引段中查找对应的 VECTOR_INDEX 索引项，
+     VECTOR_INDEX 索引项: {_index, s_ptr, e_ptr}, s_ptr和e_ptr 为文件绝对位置，可以极大的缩小查询范围。
+  2. 根据上步获取到的 {_index, s_ptr, e_ptr}, 在二分索引段中， 通过二分法，找到ip所在的 二分索引项.
+     二分索引项: {s_ip, e_ip, data_len, data_ptr}, 含义: 开始 IP, 	结束 IP, 	数据长度, 	数据指针.
+     当目标int_ip 落在 s_ip, e_ip 之间时， 则该二分索引项为目标项.
+  3. 根据找到的 data_len, data_ptr，从 地域信息段中对应位置( data_ptr),读取(data_len)字节数据
+  4. 注意: agent中的 data和segment_index 都是纯数据，而 文件中的位置 都是相对文件开始(bof)的偏移量，
+     所以要从 data和segment_index 读取数据时，都要 使用全局文件位置 - data 或  segment_index 的初始偏移。
+     segment_index 的初始偏移为 meta.segment_index_first
+     data的初始偏移为 @bytes_512k + @xdb_header_size
+  """
   def lookup(ip) do
     IO.inspect(ip, label: "要查询的 IP 地址")
 
@@ -26,7 +48,7 @@ defmodule Ip2regionXdb.Database  do
 
     # IO.inspect(meta, label: "从 agent 中获取的 meta 元数据")
 
-    # 根据 IP 地址的前 2 个字节，在向量索引段中查找对应的 segment 索引项
+    # 1. 根据 IP 地址的前 2 个字节，在向量索引段中查找对应的 segment 索引项
     int_ip = Utils.ip_to_int(ip)
     IO.inspect(int_ip, label: "IP 地址转换为整数")
     <<a::8, b::8, _rest::binary>> = <<int_ip::32>>
@@ -36,10 +58,10 @@ defmodule Ip2regionXdb.Database  do
 
     segment_index_first = meta.segment_index_first
 
-    # 在二分索引段中， 通过二分法，找到ip所在的 二分索引项
+    # 2. 在二分索引段中， 通过二分法，找到ip所在的 二分索引项
     case search_ip(segment_index, segment_index_first, int_ip, s_ptr, e_ptr, 0, div(e_ptr - s_ptr, @xdb_per_segment_index_size ) ) do
       {:ok, {_s_ip, _e_ip, data_len, data_ptr}} ->
-        # 从 地域信息段 中读取 数据项
+        # 3.从 地域信息段 中读取 数据项
         data_segment_term = read_data_segment_item(data, data_ptr, data_len)
         {:ok, data_segment_term}
       {:error, msg }   ->
@@ -47,10 +69,6 @@ defmodule Ip2regionXdb.Database  do
         {:error, msg}
 
     end
-
-
-
-
   end
 
 
@@ -58,6 +76,7 @@ defmodule Ip2regionXdb.Database  do
   递归查询 IP 对应的地域信息.
   segment_index: 二分索引段数据, 从中读取索引项时，需要从  全局文件位置 - segment_index_first
   segment_index_first: 二分索引段 开始地址
+  int_ip: 要查询的 IP 地址转换为整数
   s_ptr: 搜索范围开始地址，  在文件中的位置
   e_ptr: 搜索范围结束地址， 在文件中的位置
   low: 二分索引段  索引项 开始id，转换为地址 s_ptr + low * @xdb_per_segment_index_size

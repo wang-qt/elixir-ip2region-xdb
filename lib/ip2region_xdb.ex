@@ -10,7 +10,7 @@ defmodule Ip2regionXdb do
   查找 IP 对应的地域信息.
   从 pool中获取一个 worker 进程, 并调用其 lookup 方法.
   对应模块 Ip2regionXdb.Server 的 handle_call 方法.
-  ip: {a,b,c,d}
+
 
   Ip2regionXdb.lookup("1.80.167.78")
   Ip2regionXdb.lookup("123.139.40.31")
@@ -28,6 +28,7 @@ defmodule Ip2regionXdb do
     end
   end
 
+  # ip: {a,b,c,d}
   def lookup(ip) do
     :poolboy.transaction(Pool, &GenServer.call(&1, { :lookup, ip }))
   end

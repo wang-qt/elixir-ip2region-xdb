@@ -53,7 +53,12 @@ defmodule Ip2regionXdb.Database.Loader do
     end
   end
 
-  defp read_database(filename) do
+  @doc """
+  读取 XDB 文件数据到内存中, 把文件 拆分为 vector_index, data, segment_index 三部分.
+  1. 把 VECTOR_INDEX 向量索引段，加载到ets中。
+  2. 把 地域信息段data，和 二分索引段segment_index 返回，最终加载到 agent中
+  """
+  def read_database(filename) do
 
     raw_data = File.read!(filename)
 
@@ -136,7 +141,6 @@ defmodule Ip2regionXdb.Database.Loader do
     Storage.set(:vector_index, vector_index)
     Storage.set(:data, data)
     Storage.set(:segment_index, segment_index)
-
     :ok
   end
 
