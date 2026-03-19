@@ -18,6 +18,7 @@ defmodule Ip2regionXdb do
   Ip2regionXdb.lookup("183.250.89.176")
   Ip2regionXdb.lookup("1.80.153.93")
   {:ok, "中国|陕西省|西安市|电信|CN"}
+  添加注释，测试vscode git
   """
   def lookup(ip) when is_binary(ip) do
     ip = String.to_charlist(ip)
