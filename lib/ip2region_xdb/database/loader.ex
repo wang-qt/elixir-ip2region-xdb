@@ -18,9 +18,7 @@ defmodule Ip2regionXdb.Database.Loader do
 
   # 所以整个vector索引段占据的空间为：256 × 256 × 8 = 524288 Bytes = 512 KiB
   @bytes_512k  524288
-  @xdb_vector_index_count   65536        # 向量索引 个数
   @xdb_vector_index_size    @bytes_512k  # xdb 向量索引段 总字节数
-  @xdb_per_vector_index_size   8          # 每个vector索引项 字节数
 
   @xdb_per_segment_index_size   14        # 每个segment索引项 字节数
 
@@ -36,16 +34,21 @@ defmodule Ip2regionXdb.Database.Loader do
     # 创建 ets 表
     :ets.new(@vector_index_table, [:named_table, :set, :public])
 
-     # 加载数据库文件到内存
-     load_database(filename)
+    # 加载数据库文件到内存
+    case load_database(filename) do
+      :ok ->
+        {:ok, %{database: filename}}
 
-     { :ok, %{ database: filename } }
+      {:stop, reason} ->
+        {:stop, reason}
+    end
   end
 
 
   defp load_database(database) do
     case File.regular?(database) do
-      false -> { :error, "File '#{database}' does not exists!" }
+      # false -> { :error, "File '#{database}' does not exists!" }
+      false -> { :stop, "File '#{database}' does not exists!" }
       true ->
         database
         |> read_database()
@@ -96,9 +99,6 @@ defmodule Ip2regionXdb.Database.Loader do
         segment_index_last: segment_index_last,
         segment_index_count: div(segment_index_last - segment_index_first, @xdb_per_segment_index_size),
       }
-
-    IO.inspect(meta, label: "meta: ")
-
 
     # 把 向量索引段 拆分 保存到 ets 表中, 共 65536 个索引项
     load_vector_index_aux(vector_index, 0)

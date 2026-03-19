@@ -39,7 +39,7 @@ defmodule Ip2regionXdb.Database  do
      data的初始偏移为 @bytes_512k + @xdb_header_size
   """
   def lookup(ip) do
-    IO.inspect(ip, label: "要查询的 IP 地址")
+    # IO.inspect(ip, label: "要查询的 IP 地址")
 
     meta = Storage.get(:meta)    #  数据库描述
     # vector_index = Storage.get(:vector_index)    # 向量索引段
@@ -50,7 +50,7 @@ defmodule Ip2regionXdb.Database  do
 
     # 1. 根据 IP 地址的前 2 个字节，在向量索引段中查找对应的 segment 索引项
     int_ip = Utils.ip_to_int(ip)
-    IO.inspect(int_ip, label: "IP 地址转换为整数")
+    # IO.inspect(int_ip, label: "IP 地址转换为整数")
     <<a::8, b::8, _rest::binary>> = <<int_ip::32>>
 
     vector_idx = a * @xdb_vector_cols + b
@@ -65,7 +65,7 @@ defmodule Ip2regionXdb.Database  do
         data_segment_term = read_data_segment_item(data, data_ptr, data_len)
         {:ok, data_segment_term}
       {:error, msg }   ->
-         IO.puts("错误信息: #{msg}")
+        #  IO.puts("错误信息: #{msg}")
         {:error, msg}
 
     end
@@ -107,7 +107,7 @@ defmodule Ip2regionXdb.Database  do
     end
   end
 
-  def search_ip(_segment_index, _int_ip, _s_ptr, _e_ptr, _low, _high)  do
+  def search_ip(_segment_index, _segment_index_first, _int_ip, _s_ptr, _e_ptr, _low, _high)  do
     {:error, "IP 地址不在数据库的搜索范围中"}
   end
 
